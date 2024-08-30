@@ -24,10 +24,6 @@ export async function upload(app: FastifyInstance) {
     try {
       const { image, customer_code, measure_datetime, measure_type } = uploadBody.parse(request.body);
 
-      if ((false)) {
-        throw new Error("Failed to extract a valid meter reading from the image");
-      }
-
       const existingReading = await prisma.measure.findFirst({
         where: {
           measure_type: measure_type,
@@ -46,8 +42,12 @@ export async function upload(app: FastifyInstance) {
         return
       }
 
-      const { response, imageParts } = await getResponseIA(model, image);
+      const response = await getResponseIA(model, image);
       const measureValue = parseFloat(response.text().trim());
+
+      if (!measureValue) {
+        throw new Error("Falha ao extrair uma leitura de medidor válida da imagem");
+      }
 
       const measurement = await prisma.measure.create({
         data: {
@@ -100,5 +100,5 @@ async function getResponseIA(model: GenerativeModel, image: string) {
   const result = await model.generateContent([prompt, ...imageParts]);
   const response = result.response;
 
-  return { response, imageParts };
+  return response;
 }
