@@ -15,6 +15,7 @@ model Measure {
   customer_code    String   @default(uuid())
   measure_datetime DateTime
   measure_type     String
+  confirmed_value  Int
   has_confirmed    Boolean
   image_url        String
 

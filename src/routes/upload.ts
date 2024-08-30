@@ -55,12 +55,13 @@ export async function upload(app: FastifyInstance) {
           measure_datetime: new Date(measure_datetime),
           measure_type: measure_type,
           image_url: image,
+          confirmed_value: measureValue,
           has_confirmed: false
         }
       });
 
       reply.code(200).send({
-        image_url: measurement.image_url,
+        image_url: image,
         measure_value: measureValue,
         measure_uuid: measurement.measure_uuid
       });
