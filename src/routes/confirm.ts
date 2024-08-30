@@ -1,4 +1,4 @@
-import { FastifyInstance } from "fastify";
+import { FastifyInstance, FastifyReply } from "fastify";
 import { prisma } from "../lib/prisma";
 import z from "zod";
 
@@ -13,25 +13,7 @@ export async function confirm(app: FastifyInstance) {
     try {
       const { measure_uuid, confirmed_value } = confirmBody.parse(request.body);
 
-      const measureObject = await prisma.measure.findFirst({
-        where: {
-          measure_uuid: measure_uuid
-        }
-      });
-
-      if (!measureObject) {
-        reply.code(404).send({
-          error_code: "MEASURE_NOT_FOUND",
-          error_description: "Leitura não encontrada"
-        });
-        return
-      }
-
-      if (measureObject.has_confirmed) {
-        reply.code(409).send({
-          error_code: "MEASURE_ALREADY_CONFIRMED",
-          error_description: "Leitura já confirmada"
-        });
+      if (!(await validMeasurementToEdit(measure_uuid, reply))) {
         return
       }
 
@@ -55,4 +37,30 @@ export async function confirm(app: FastifyInstance) {
     }
 
   })
+
+  async function validMeasurementToEdit(measure_uuid: string, reply: FastifyReply) {
+    const measureObject = await prisma.measure.findFirst({
+      where: {
+        measure_uuid: measure_uuid
+      }
+    });
+
+    if (!measureObject) {
+      reply.code(404).send({
+        error_code: "MEASURE_NOT_FOUND",
+        error_description: "Leitura não encontrada"
+      });
+      return false
+    }
+
+    if (measureObject.has_confirmed) {
+      reply.code(409).send({
+        error_code: "MEASURE_ALREADY_CONFIRMED",
+        error_description: "Leitura já confirmada"
+      });
+      return false
+    }
+
+    return true
+  }
 }
