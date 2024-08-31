@@ -1,22 +1,19 @@
 import { FastifyInstance } from "fastify";
-import { GoogleGenerativeAI, GenerativeModel } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
+import { prisma } from "../lib/prisma";
 import z from "zod";
 import dotenv from "dotenv";
-import * as fs from "fs";
-import { prisma } from "../lib/prisma";
 
 dotenv.config();
 
 export async function upload(app: FastifyInstance) {
   app.post('/upload', async (request, reply) => {
-    const model = getModelIA();
-
     const uploadBody = z.object({
       image: z.string().regex(
         /^data:image\/[a-zA-Z]+;base64,[^\s]+$/,
         "Invalid base64 image format"
       ),
-      customer_code: z.string(),
+      customer_code: z.string().uuid(),
       measure_datetime: z.string().datetime(),
       measure_type: z.enum(['WATER', 'GAS'])
     });
@@ -26,6 +23,7 @@ export async function upload(app: FastifyInstance) {
 
       const existingReading = await prisma.measure.findFirst({
         where: {
+          customer_code: customer_code,
           measure_type: measure_type,
           measure_datetime: {
             gte: new Date(new Date(measure_datetime).getFullYear(), new Date(measure_datetime).getMonth(), 1), // Início do mês
@@ -42,7 +40,7 @@ export async function upload(app: FastifyInstance) {
         return
       }
 
-      const response = await getResponseIA(model, image);
+      const response = await getResponseIA(image);
       const measureValue = parseFloat(response.text().trim());
 
       if (!measureValue) {
@@ -61,9 +59,9 @@ export async function upload(app: FastifyInstance) {
       });
 
       reply.code(200).send({
-        image_url: image,
         measure_value: measureValue,
-        measure_uuid: measurement.measure_uuid
+        measure_uuid: measurement.measure_uuid,
+        image_url: image,
       });
 
     } catch (error) {
@@ -94,10 +92,11 @@ function getModelIA() {
   return genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 }
 
-async function getResponseIA(model: GenerativeModel, image: string) {
+async function getResponseIA(image: string) {
   const prompt = "Analyze this image and extract the meter reading value. Return only the numeric value without any additional text.";
   const imageParts = [base64ToGenerativePart(image, 'image/jpeg')];
-  const result = await model.generateContent([prompt, ...imageParts]);
+
+  const result = await getModelIA().generateContent([prompt, ...imageParts]);
   const response = result.response;
 
   return response;
